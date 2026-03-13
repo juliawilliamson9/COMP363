@@ -1,0 +1,232 @@
+from __future__ import annotations  # for cool type hinting
+from pympler import asizeof
+
+
+class Node:
+    """A simple binary tree node for a basic Huffman encoder."""
+
+    def __init__(self,  symbol: str | None, frequency: int):
+        """Object constructor.
+
+        Inputs
+        ------
+        frequency : int
+          The frequency represented by this node. If the node has also a symbol,
+          this is the frequency of the symbol. If no symbol is present, this is
+          the sum of frequencies of the node's subtrees.
+        symbol : char
+          The symbol whose frequency we capture. If symbol is None, the node
+          captures frequencies for subtrees under the node.
+
+        Returns
+        -------
+        Instance of Node object with fields:
+          frequency : as described above
+          symbol : as described above
+          left : pointer to left node child (default none)
+          right : pointer to right node child (default none)
+        """
+        self.__frequency: int = frequency
+        self.__symbol: str | None = symbol
+        self.__left: None | Node = None
+        self.__right: None | Node = None
+
+    def __lt__(self, other: Node):
+        """Redefine < for node to be based on frequency value"""
+        return self.__frequency < other.get_frequency()
+
+    def set_left(self, left: Node | None):
+        """Setter for left child."""
+        self.__left = left
+
+    def set_right(self, right: Node | None):
+        """Setter for right child."""
+        self.__right = right
+
+    def has_left(self):
+        """Predicate accessor for left child"""
+        return self.__left is not None
+
+    def has_right(self):
+        """Predicate accessor for right child"""
+        return self.__right is not None
+
+    def get_left(self):
+        """Accessor for left child"""
+        return self.__left
+
+    def get_right(self):
+        """Accessor for right child."""
+        return self.__right
+
+    def get_symbol(self) -> str:
+        """Accessor for the symbol in a leaf node"""
+        return self.__symbol
+
+    def get_frequency(self):
+        """Accessor for frequency."""
+        return self.__frequency
+
+    def is_leaf(self) -> bool:
+        """Determines if node is leaf node, indicated by the
+        absence of both child pointers."""
+        return self.__left is None and self.__right is None
+
+    def __str__(self):
+        """String representation of object."""
+        return f"[ {self.__symbol}: {self.__frequency} ]"
+    
+
+
+def lowest_freq(freq_list: list[Node]) -> int:
+    """Finds and Node out of list with lowest frequency
+        and returns its index"""
+    # Initialize lowest amount in list as first item
+    low_freq_node = freq_list[0]
+
+    # Iterate through freq_list, updating low_freq_node
+    for node in freq_list:
+        if node < low_freq_node:
+            low_freq_node = node
+    
+    # Return the index of the lowest frequency node
+    return freq_list.index(low_freq_node)
+
+def frequency_count(message: str) -> list[int]:
+    """Counts frequencies of each character and returns in a list
+        according to ord(char)."""
+    # Initialize frequency list with length 256 (amount ASCII values)
+    freq_list = [0] * 256
+
+    # Iterate through message and tally up frequencies of each character
+    for char in message:
+        freq_list[ord(char)] += 1
+    
+    return freq_list
+    
+def construct_huffman(message: str) -> Node:
+    """Uses frequency list to build Huffman tree. Returns head."""
+    # Retrieve frequency list of message
+    freq_list = frequency_count(message)
+
+    # Initialize list of nodes
+    forest = []
+
+    # For each ASCII value (256) if freq > 0, create a node and add to node list
+    for i in range(256):
+        if freq_list[i] > 0:
+            node = Node(chr(i), freq_list[i])
+            forest.append(node)
+
+    # Create Huffman tree with list of nodes
+    while len(forest) > 1:
+        # Remove two nodes with lowest frequencies
+        n_1 = forest.pop(lowest_freq(forest))
+        n_2 = forest.pop(lowest_freq(forest))
+
+        # Create new node with sum of past two frequencies and add to forest
+        n_12 = Node(None, n_1.get_frequency() + n_2.get_frequency())
+        forest.append(n_12)
+
+        # Assign removed nodes as children of new node
+        n_12.set_left(n_1)
+        n_12.set_right(n_2)
+    
+    return forest[0]
+
+def build_huffman_list(head: Node, encoding="", table: dict=None) -> dict:
+    """Takes head of huffman tree and recursively builds a dictionary with
+        the characters and cooresponding encodings."""
+    # If table does not exist, initialize an empty one
+    if table is None:
+        table = {}
+    
+    # If the node is a leaf node, add it to the dictionary with its encoding
+    if head.is_leaf():
+        table[head.get_symbol()] = encoding
+    else:
+        # If the node has left child, check it with new encoding adding '0'
+        if head.has_left():
+            build_huffman_list(head.get_left(), encoding + '0', table)
+
+        # If the node has right child, check it with new encoding adding '1'
+        if head.has_right():
+            build_huffman_list(head.get_right(), encoding + '1', table)
+
+    return table
+
+def encode_huffman(message: str) -> tuple[str,Node]:
+    """Takes a message and encodes it using Huffman's technique.
+        Returns the encoded message and the head of the Huffman tree."""
+    # Construct huffman graph and save head
+    huffman_head = construct_huffman(message)
+
+    # Create dictionary of encoding for the characters
+    huff_dict = build_huffman_list(huffman_head)
+
+    # Initialize string of encoded message
+    enc_message = ""
+
+    # For each character, encode it using huffman dictionary
+    for char in message:
+        enc_message += huff_dict[char]
+
+    return enc_message, huffman_head
+
+def decode_huffman(e_message: str, head: Node) -> str:
+    """Takes an encoded message and head of Huffman tree and returns the 
+        decoded message."""
+    # Initialize decoded message and starting node
+    d_message = ""
+    node = head
+
+    # Iterate through each character in encoded message
+    for char in e_message:
+        # If it is a zero move to left child node
+        if char == "0":
+            node = node.get_left()
+        # If it is a one move to right child node
+        else: 
+            node = node.get_right()
+
+        # If node is a leaf node then add the character to the decoded message
+        if node.is_leaf():
+            d_message += node.get_symbol()
+            # Start again at head
+            node = head
+        
+    return d_message
+
+def main():
+    """Tests encoding with Huffman tree on SOURCE. Measures how many bits
+        were saved by using Huffman encoding as well as the size of the tree."""
+    # Import message to encode
+    with open('midsummer_nights_dream.txt', 'r') as f:
+        message = f.read()
+
+    message = message.encode("ascii", "ignore").decode()
+
+    # Encode message
+    enc_message, huff_head = encode_huffman(message)
+
+    # Decode message
+    dec_message = decode_huffman(enc_message, huff_head)
+
+    # Calculate length of encoded message without Huffman (8 bits per character)
+    og_length = 8 * len(message)
+
+    # Measure length of encoded message with Huffman
+    huff_length = len(enc_message)
+
+    # Measure length of Huffman tree
+    tree_length = asizeof.asizeof(huff_head)
+
+    # Print comparison of lengths of Huffman and non-Huffman
+    print(f"Huffman decreased encoding from {og_length} bits to {huff_length} bits.")
+    print(f"This is a decrease of {og_length - huff_length}.")
+
+    # Print length of Huffman tree
+    print(f"Huffman tree takes {tree_length} bits to store.")
+
+if __name__ == "__main__":
+    main()
