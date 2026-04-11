@@ -1,0 +1,93 @@
+def optimal_value(string1: str, string2: str) -> list[list[int]]:
+    """Returns subproblem table for strings of length m and n."""
+    n = len(string1)
+    m = len(string2)
+
+    # Gap/misalign penalty
+    gap = 1
+    misalign = 5
+
+    # Initialize matrix of penalties string1 with string2
+    P = [[0]*(m+1) for _ in range(n+1)]
+
+    # Base cases, as many gaps as there are characters
+    for i in range(1,n+1):
+        P[i][0] = i * gap 
+
+    for j in range(1,m+1):
+        P[0][j] = j * gap
+
+    # Fill in remaining slots, based on base case
+    for i in range(1,n+1):
+        for j in range(1,m+1):
+            if string1[i-1] == string2[j-1]:
+                cost = 0
+            else:
+                cost = misalign
+            
+            P[i][j] = min(
+                P[i-1][j-1] + cost, # No space, match or different
+                P[i-1][j] + gap, # Add space
+                P[i][j-1] + gap # Add space
+            )
+    return P
+
+def trace_back(string1: str, string2: str, P:list[list[int]]) -> tuple:
+    """Reconstruct alignment with least penalty given table."""
+    # Initialize iterations
+    i = len(string1)
+    j = len(string2)
+
+    # Gap/misalign penalty
+    gap = 1
+    misalign = 5
+
+    # Initialize aligned string
+    aligned1 = []
+    aligned2 = []
+
+    # Iterate through table until done
+    while i > 0 or j > 0:
+        # If match or mismatch
+        if i > 0 and j > 0:
+            if string1[i-1] == string2[j-1]:
+                cost = 0
+            else: 
+                cost = misalign
+
+            if P[i][j] == P[i-1][j-1] + cost:
+                aligned1.append(string1[i-1])
+                aligned2.append(string2[j-1])
+                i -= 1
+                j -= 1
+                continue
+        # If gap in string 2
+        if i > 0 and P[i][j] == P[i-1][j] + gap:
+            aligned1.append(string1[i-1])
+            aligned2.append('-')
+            i -= 1
+            continue
+        # If gap in string 1
+        if j > 0 and P[i][j] == P[i][j-1] + gap:
+            aligned1.append('-')
+            aligned2.append(string2[j-1])
+            j -= 1
+            continue
+        
+    # Reverse strings
+    aligned1 = ''.join(reversed(aligned1))
+    aligned2 = ''.join(reversed(aligned2))
+    return aligned1, aligned2
+
+tests = [
+    ["CRANE", "RAIN"],
+    ["CYCLE", "BICYCLE"],
+    ["ASTRONOMY", "GASTRONOMY"],
+    ["INTENTION", "EXECUTION"],
+    ["AGGTAB", "GXTXAYB"],
+    ["GATTACA", "GCATGCU"],
+    ["DELICIOUS", "RELIGIOUS"],
+]
+
+for pair in tests:
+    print(trace_back(pair[0], pair[1], optimal_value(pair[0],pair[1])))
